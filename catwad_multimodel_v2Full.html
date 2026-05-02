@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>CATWAD STUDIO - MULTI MODEL BUILDER</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --orange: #ff8c00; --dark: #0d0d0f; --card: #1a1a1c; --green: #00ff88; --red: #ff4444; }
+        body { background: var(--dark); color: #eee; font-family: 'Kanit', sans-serif; padding: 20px; }
+        .card { background: var(--card); border: 1px solid #333; padding: 25px; border-radius: 15px; max-width: 1000px; margin: auto; }
+        h1 { color: var(--orange); text-align: center; border-bottom: 2px solid var(--orange); padding-bottom: 10px; margin-top: 0; }
+        .item-slot { background: #252529; border-left: 5px solid var(--orange); padding: 20px; border-radius: 10px; margin-bottom: 20px; position: relative; }
+        .slot-title { color: var(--orange); font-weight: bold; font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+        .btn-remove { background: transparent; color: var(--red); border: 1px solid var(--red); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+        .btn-remove:hover { background: var(--red); color: #000; }
+        label { color: var(--orange); font-weight: bold; font-size: 12px; display: block; margin-top: 10px; }
+        input[type=text], select { background: #000; color: #fff; border: 1px solid #444; padding: 10px; width: 100%; border-radius: 8px; margin-top: 5px; box-sizing: border-box; font-family: 'Kanit', sans-serif; }
+        input[type=file] { background: #000; color: #aaa; border: 1px solid #444; padding: 8px; width: 100%; border-radius: 8px; margin-top: 5px; box-sizing: border-box; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+
+        /* Toggle Switch */
+        .toggle-row { display: flex; align-items: center; gap: 12px; background: #1e1e22; border: 1px solid #333; padding: 14px 18px; border-radius: 10px; margin-bottom: 18px; }
+        .toggle-label { flex: 1; }
+        .toggle-label strong { color: var(--orange); font-size: 14px; display: block; }
+        .toggle-label span { color: #777; font-size: 11px; }
+        .switch { position: relative; display: inline-block; width: 48px; height: 26px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; inset: 0; background: #333; border-radius: 26px; transition: .3s; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: #aaa; border-radius: 50%; transition: .3s; }
+        input:checked + .slider { background: var(--orange); }
+        input:checked + .slider:before { transform: translateX(22px); background: #000; }
+
+        /* Auto-Equip Panel */
+        .autoeq-panel { background: #1c1c22; border: 1px solid rgba(255,140,0,.3); border-radius: 10px; padding: 16px 18px; margin-top: 12px; }
+        .autoeq-panel.hidden { display: none; }
+        .autoeq-title { color: var(--orange); font-size: 12px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .xbox-entry { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .xbox-entry input[type=text] { margin-top: 0; }
+        .btn-add-xbox { background: transparent; color: var(--green); border: 1px dashed var(--green); border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 12px; font-family: 'Kanit', sans-serif; width: 100%; margin-top: 6px; transition: .2s; }
+        .btn-add-xbox:hover { background: rgba(0,255,136,.1); }
+        .btn-rm-xbox { background: transparent; color: var(--red); border: 1px solid var(--red); border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 11px; flex-shrink: 0; }
+        .btn-rm-xbox:hover { background: var(--red); color: #000; }
+
+        /* Optional section */
+        .opt-section { margin-top: 8px; border: 1px dashed #3a3a40; border-radius: 8px; overflow: hidden; }
+        .opt-header { background: #1a1a1e; padding: 9px 14px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #888; user-select: none; transition: background .2s; }
+        .opt-header:hover { background: #222228; color: #bbb; }
+        .opt-header .badge { font-size: 10px; background: #2a2a30; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+        .opt-header .badge.loaded { background: rgba(0,255,136,.12); color: #00ff88; border: 1px solid rgba(0,255,136,.2); }
+        .opt-body { display: none; padding: 14px; background: #1c1c20; }
+        .opt-body.open { display: block; }
+        .opt-icon { font-size: 14px; margin-right: 6px; }
+        .chevron { transition: transform .2s; display: inline-block; margin-left: 6px; }
+        .chevron.open { transform: rotate(180deg); }
+
+        /* File drop zone */
+        .fdrop { position: relative; border: 1.5px dashed #3a3a40; border-radius: 8px; padding: 10px 12px 8px; cursor: pointer; transition: border-color .2s, background .2s; background: #111115; margin-top: 6px; }
+        .fdrop:hover { border-color: var(--orange); background: rgba(255,140,0,.04); }
+        .fdrop input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; margin: 0; padding: 0; border: none; background: transparent; }
+        .fdrop-label { font-size: 11px; color: #555; text-align: center; pointer-events: none; }
+        .fdrop-label .icon { font-size: 18px; display: block; margin-bottom: 2px; }
+        .fdrop-name { font-size: 11px; color: var(--green); margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fdrop-preview { width: 100%; max-height: 80px; object-fit: contain; border-radius: 5px; margin-top: 6px; display: none; background: #000; border: 1px solid #333; }
+
+        .status { font-size: 11px; margin-top: 4px; padding: 2px 0; }
+        .status.ok  { color: var(--green); }
+        .status.def { color: #ffcc00; }
+        .status.err { color: var(--red); }
+
+        .btn-add { background: transparent; color: var(--orange); border: 2px solid var(--orange); padding: 12px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 20px; transition: 0.2s; font-family: 'Kanit', sans-serif; font-size: 15px; }
+        .btn-add:hover { background: var(--orange); color: #000; }
+        .btn-build { background: var(--orange); color: #000; border: none; padding: 20px; width: 100%; border-radius: 12px; cursor: pointer; font-size: 22px; font-weight: bold; box-shadow: 0 4px 15px rgba(255,140,0,.3); font-family: 'Kanit', sans-serif; transition: .2s; }
+        .btn-build:hover { background: #ffaa22; box-shadow: 0 6px 24px rgba(255,140,0,.4); }
+        .section-header { color: #888; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px solid #2a2a2a; padding-bottom: 6px; margin: 18px 0 10px; }
+        .hint { color: #555; font-size: 10px; margin-top: 3px; font-style: italic; }
+
+        /* Multi-model rows */
+        /* ── Multi-Geometry ── */
+        .model-file-block { background: #141418; border: 1px dashed #333; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+        .model-file-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .model-file-name { flex: 1; font-size: 12px; color: var(--green); }
+        .model-file-pick { position: relative; display: inline-flex; align-items: center; gap: 6px; background: #0a0a0f; border: 1px dashed #444; border-radius: 7px; padding: 6px 12px; font-size: 11px; color: #aaa; cursor: pointer; transition: border-color .2s; }
+        .model-file-pick:hover { border-color: var(--orange); color: #eee; }
+        .model-file-pick input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+        .geo-entry { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .geo-entry-key { width: 120px; flex-shrink: 0; }
+        .geo-entry-key input { padding: 6px 10px; font-size: 12px; margin-top: 0; }
+        .geo-entry-id { flex: 1; font-size: 11px; color: #4fc3f7; background: #0a0c14; border: 1px solid #1e2535; border-radius: 6px; padding: 6px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .btn-rm-geo { background: transparent; color: var(--red); border: 1px solid var(--red); border-radius: 5px; padding: 3px 8px; cursor: pointer; font-size: 11px; flex-shrink: 0; }
+        .btn-rm-geo:hover { background: var(--red); color: #000; }
+        .btn-rm-model-file { background: transparent; color: var(--red); border: 1px solid var(--red); border-radius: 5px; padding: 3px 8px; cursor: pointer; font-size: 11px; }
+        .btn-rm-model-file:hover { background: var(--red); color: #000; }
+        .btn-add-model { background: transparent; color: var(--orange); border: 1px dashed var(--orange); border-radius: 7px; padding: 7px; cursor: pointer; font-size: 12px; font-family: 'Kanit', sans-serif; width: 100%; margin-top: 4px; transition: .2s; }
+        .btn-add-model:hover { background: rgba(255,140,0,.08); }
+        .geo-col-hdr { display: flex; gap: 8px; font-size: 10px; color: #555; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; padding: 0 2px; }
+        .geo-col-hdr .c1 { width: 120px; flex-shrink: 0; }
+        .geo-col-hdr .c2 { flex: 1; }
+
+        .feature-tag { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle; }
+        .feature-tag.on  { background: rgba(255,140,0,.15); color: var(--orange); border: 1px solid rgba(255,140,0,.3); }
+        .feature-tag.off { background: #222; color: #555; border: 1px solid #333; }
+
+        /* Skin texture + icon row */
+        .tex-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+        .tex-label-row { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+        .tex-sublabel { font-size: 10px; color: #888; font-weight: normal; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>🐈 CATWAD MULTI-MODEL</h1>
+
+    <div class="grid" style="margin-bottom:16px">
+        <div>
+            <label>PROJECT NAME</label>
+            <input type="text" id="packName" value="Catwad_Custom_Pack">
+        </div>
+        <div>
+            <label>AUTHOR CREDIT</label>
+            <input type="text" id="packAuthor" value="CATWAD STUDIO">
+        </div>
+    </div>
+
+    <div style="margin-bottom:22px;border-bottom:1px solid #333;padding-bottom:18px">
+        <label>PACK ICON (.PNG)</label>
+        <input type="file" id="packIcon" accept="image/png">
+    </div>
+
+    <!-- TOGGLE: First-Join Auto-Equip -->
+    <div class="toggle-row">
+        <div class="toggle-label">
+            <strong>🎁 First-Join Auto-Equip
+                <span class="feature-tag off" id="featureTag">ปิดอยู่</span>
+            </strong>
+            <span>เมื่อเปิด — แต่ละไอเทมจะมีช่องให้ใส่ชื่อ Xbox ที่ต้องการให้รับไอเทมนั้นสวมใส่อัตโนมัติตอนเข้าเกมครั้งแรก พร้อม generate script .js ใน BP</span>
+        </div>
+        <label class="switch">
+            <input type="checkbox" id="toggleAutoEquip" onchange="onToggleAutoEquip(this)">
+            <span class="slider"></span>
+        </label>
+    </div>
+
+    <div id="itemList"></div>
+
+    <button class="btn-add" onclick="addItem()">+ ADD NEW ITEM & MODEL</button>
+    <button class="btn-build" onclick="buildPack()">📦 EXPORT .MCADDON</button>
+</div>
+
+<script>
+let itemIdx = 0;
+let itemsData = {};
+let autoEquipEnabled = false;
+
+function onToggleAutoEquip(cb) {
+    autoEquipEnabled = cb.checked;
+    const tag = document.getElementById('featureTag');
+    tag.textContent = autoEquipEnabled ? 'เปิดอยู่' : 'ปิดอยู่';
+    tag.className = 'feature-tag ' + (autoEquipEnabled ? 'on' : 'off');
+    document.querySelectorAll('.autoeq-panel').forEach(p => {
+        p.classList.toggle('hidden', !autoEquipEnabled);
+    });
+}
+
+function toggleOpt(el) {
+    const body = el.nextElementSibling;
+    const chev = el.querySelector('.chevron');
+    body.classList.toggle('open');
+    chev.classList.toggle('open');
+}
+
+function readJSON(file, cb) {
+    const r = new FileReader();
+    r.onload = e => { try { cb(null, JSON.parse(e.target.result)); } catch(err) { cb(err); } };
+    r.readAsText(file);
+}
+
+function readFileB64(file) {
+    return new Promise(res => {
+        const r = new FileReader();
+        r.onload = e => res(e.target.result.split(',')[1]);
+        r.readAsDataURL(file);
+    });
+}
+
+function addXboxRow(panelId) {
+    const panel = document.getElementById('xbox_list_' + panelId);
+    const div = document.createElement('div');
+    div.className = 'xbox-entry';
+    div.innerHTML = `<input type="text" placeholder="ชื่อ Xbox เช่น BeeBee5029" style="flex:1;margin-top:0">
+                     <button class="btn-rm-xbox" onclick="this.parentElement.remove()">✕</button>`;
+    panel.appendChild(div);
+}
+
+/* ══ ADD ITEM ══ */
+function addItem() {
+    itemIdx++;
+    const id = `it_${itemIdx}`;
+    itemsData[id] = {
+        skin: null, skinB64: null,
+        emissive: null, emissiveB64: null,   // emissive PNG → TGA
+        itemIcon: null, itemIconB64: null,    // item icon PNG (optional)
+        models: [],  // [{key, geoId, json, fileName}] — หลาย geometry ได้
+        anim: null, animIds: [],
+        animCtrl: null, animCtrlIds: [],
+        renderCtrl: null, renderCtrlId: null,
+    };
+
+    document.getElementById('itemList').insertAdjacentHTML('beforeend', `
+    <div class="item-slot" id="slot_${id}">
+        <div class="slot-title">
+            <span>📦 ITEM #${itemIdx}</span>
+            <button class="btn-remove" onclick="removeItem('${id}')">✕ ลบ</button>
+        </div>
+
+        <div class="grid">
+            <div>
+                <label>ITEM ID</label>
+                <input type="text" id="id_${id}" value="item${itemIdx}">
+            </div>
+            <div>
+                <label>DISPLAY NAME</label>
+                <input type="text" id="name_${id}" value="Custom Armor ${itemIdx}">
+            </div>
+        </div>
+
+        <div class="grid" style="margin-top:8px">
+            <div>
+                <label>EQUIP SLOT</label>
+                <select id="pos_${id}">
+                    <option value="head">HEAD (Helmet)</option>
+                    <option value="chest">CHEST (Chestplate)</option>
+                    <option value="legs">LEGS (Leggings)</option>
+                    <option value="feet">FEET (Boots)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- ══ TEXTURES ══ -->
+        <div class="section-header" style="margin-top:16px">🖼 Textures</div>
+        <div class="grid3">
+            <!-- Main Skin -->
+            <div>
+                <label>SKIN TEXTURE (PNG) *จำเป็น</label>
+                <div class="fdrop" id="fdrop_skin_${id}">
+                    <input type="file" accept="image/png" onchange="handleSkin('${id}',this)">
+                    <div class="fdrop-label"><span class="icon">🎨</span>Main Skin</div>
+                    <div class="fdrop-name" id="skin_name_${id}"></div>
+                    <img class="fdrop-preview" id="skin_prev_${id}">
+                </div>
+                <div id="skin_s_${id}" class="status def">⚠ ยังไม่ได้เลือก</div>
+            </div>
+
+            <!-- Emissive / Glow -->
+            <div>
+                <label>✨ EMISSIVE PNG → TGA — ถ้ามี</label>
+                <div class="fdrop" id="fdrop_emi_${id}">
+                    <input type="file" accept="image/png" onchange="handleEmissive('${id}',this)">
+                    <div class="fdrop-label"><span class="icon">✨</span>Emissive (glow)</div>
+                    <div class="fdrop-name" id="emi_name_${id}"></div>
+                    <img class="fdrop-preview" id="emi_prev_${id}">
+                </div>
+                <div id="emi_s_${id}" class="status def">⚪ ไม่บังคับ — ถ้าใส่จะแปลงเป็น .tga ให้</div>
+            </div>
+
+            <!-- Item Icon -->
+            <div>
+                <label>🗂 ITEM ICON (PNG) — ถ้ามี</label>
+                <div class="fdrop" id="fdrop_icon_${id}">
+                    <input type="file" accept="image/png" onchange="handleItemIcon('${id}',this)">
+                    <div class="fdrop-label"><span class="icon">🗂</span>Item Icon</div>
+                    <div class="fdrop-name" id="icon_name_${id}"></div>
+                    <img class="fdrop-preview" id="icon_prev_${id}">
+                </div>
+                <div id="icon_s_${id}" class="status def">⚪ ถ้าไม่เลือก จะใช้ Skin Texture แทน</div>
+            </div>
+        </div>
+
+        <!-- AUTO-EQUIP -->
+        <div class="autoeq-panel ${autoEquipEnabled ? '' : 'hidden'}" id="autoeq_${id}">
+            <div class="autoeq-title">🎁 Auto-Equip เมื่อเข้าเกมครั้งแรก — ใส่ชื่อ Xbox ที่จะได้รับไอเทมนี้</div>
+            <div id="xbox_list_${id}"></div>
+            <button class="btn-add-xbox" onclick="addXboxRow('${id}')">+ เพิ่มชื่อ Xbox</button>
+            <div class="hint" style="margin-top:6px">💡 ใส่หลายชื่อได้ — แต่ละชื่อจะได้รับไอเทมนี้สวมใส่อัตโนมัติ 1 ครั้ง</div>
+        </div>
+
+        <div class="section-header">ไฟล์เสริม (OPTIONAL)</div>
+
+        <!-- MODEL -->
+        <div class="opt-section">
+            <div class="opt-header" onclick="toggleOpt(this)">
+                <span><span class="opt-icon">🧊</span>Custom Model (.json)</span>
+                <span><span class="badge" id="mod_badge_${id}">ไม่ได้ใส่ — ใช้ customSlim</span><span class="chevron">▼</span></span>
+            </div>
+            <div class="opt-body">
+                <div class="hint" style="margin-bottom:10px">
+                    เพิ่มไฟล์โมเดลได้หลายไฟล์ — แต่ละไฟล์จะแสดง geometry ทั้งหมดที่อยู่ข้างใน ตั้งค่า key ได้เอง
+                </div>
+                <div class="geo-col-hdr"><span class="c1">Key ใน attachable</span><span class="c2">Geometry ID</span></div>
+                <div id="geo_files_${id}"></div>
+                <button class="btn-add-model" onclick="addModelFile('${id}')">+ เพิ่มไฟล์โมเดล (.json)</button>
+                <div id="mod_s_${id}" class="status def" style="margin-top:8px">ไม่ได้ใส่ — ใช้ geometry.humanoid.customSlim</div>
+            </div>
+        </div>
+
+        <!-- ANIMATION -->
+        <div class="opt-section" style="margin-top:6px">
+            <div class="opt-header" onclick="toggleOpt(this)">
+                <span><span class="opt-icon">🎬</span>Animation (.json)</span>
+                <span><span class="badge" id="anim_badge_${id}">ไม่ได้ใส่</span><span class="chevron">▼</span></span>
+            </div>
+            <div class="opt-body">
+                <input type="file" accept=".json" onchange="handleAnim('${id}',this)">
+                <div id="anim_s_${id}" class="status def">⚠ ไม่ได้ใส่ — จะไม่มี animations block ใน attachable</div>
+                <div class="hint">ไฟล์ animations/... JSON — inject เข้า attachable อัตโนมัติ</div>
+            </div>
+        </div>
+
+        <!-- ANIMATION CONTROLLER -->
+        <div class="opt-section" style="margin-top:6px">
+            <div class="opt-header" onclick="toggleOpt(this)">
+                <span><span class="opt-icon">🎛️</span>Animation Controller (.json)</span>
+                <span><span class="badge" id="animctrl_badge_${id}">ไม่ได้ใส่</span><span class="chevron">▼</span></span>
+            </div>
+            <div class="opt-body">
+                <input type="file" accept=".json" onchange="handleAnimCtrl('${id}',this)">
+                <div id="animctrl_s_${id}" class="status def">⚠ ไม่ได้ใส่ — จะไม่มี animation_controllers block</div>
+                <div class="hint">ไฟล์ animation_controllers/... JSON</div>
+            </div>
+        </div>
+
+        <!-- RENDER CONTROLLER -->
+        <div class="opt-section" style="margin-top:6px">
+            <div class="opt-header" onclick="toggleOpt(this)">
+                <span><span class="opt-icon">🎨</span>Render Controller (.json)</span>
+                <span><span class="badge" id="rc_badge_${id}">ไม่ได้ใส่ — ใช้ default armor</span><span class="chevron">▼</span></span>
+            </div>
+            <div class="opt-body">
+                <input type="file" accept=".json" onchange="handleRenderCtrl('${id}',this)">
+                <div id="rc_s_${id}" class="status def">⚠ ไม่ได้ใส่: ใช้ controller.render.armor</div>
+                <div class="hint">ถ้าใส่ — จะใช้ ID แรกในไฟล์นั้น แทน controller.render.armor</div>
+            </div>
+        </div>
+    </div>`);
+}
+
+function removeItem(id) {
+    document.getElementById('slot_' + id)?.remove();
+    delete itemsData[id];
+}
+
+/* ══ HANDLERS ══ */
+async function handleSkin(id, inp) {
+    if (!inp.files[0]) return;
+    const f = inp.files[0];
+    itemsData[id].skin = f;
+    itemsData[id].skinB64 = await readFileB64(f);
+    showPreview('skin_prev_' + id, itemsData[id].skinB64);
+    document.getElementById('skin_name_' + id).textContent = '✔ ' + f.name;
+    setStatus('skin_s_' + id, 'ok', '✔ ' + f.name);
+}
+
+async function handleEmissive(id, inp) {
+    if (!inp.files[0]) return;
+    const f = inp.files[0];
+    itemsData[id].emissive = f;
+    itemsData[id].emissiveB64 = await readFileB64(f);
+    showPreview('emi_prev_' + id, itemsData[id].emissiveB64);
+    document.getElementById('emi_name_' + id).textContent = '✔ ' + f.name + ' → จะแปลงเป็น .tga';
+    setStatus('emi_s_' + id, 'ok', '✔ emissive โหลดแล้ว — จะ export เป็น .tga + gen texture_set.json');
+}
+
+async function handleItemIcon(id, inp) {
+    if (!inp.files[0]) return;
+    const f = inp.files[0];
+    itemsData[id].itemIcon = f;
+    itemsData[id].itemIconB64 = await readFileB64(f);
+    showPreview('icon_prev_' + id, itemsData[id].itemIconB64);
+    document.getElementById('icon_name_' + id).textContent = '✔ ' + f.name;
+    setStatus('icon_s_' + id, 'ok', '✔ ' + f.name + ' — จะใช้รูปนี้เป็น item icon');
+}
+
+/* ══════════════════════════════════════════════════
+   MULTI-MODEL: 1 ไฟล์ = หลาย geometry — กด + เพิ่มไฟล์ได้
+══════════════════════════════════════════════════ */
+
+// itemsData[id].models = [ { fileId, fileName, json, geos:[{geoId,key}] } ]
+
+function addModelFile(id) {
+    const fileId = 'mf_' + id + '_' + Date.now();
+    const container = document.getElementById('geo_files_' + id);
+    const block = document.createElement('div');
+    block.className = 'model-file-block';
+    block.id = fileId;
+    block.innerHTML = `
+        <div class="model-file-hdr">
+            <label class="model-file-pick">
+                <input type="file" accept=".json" onchange="handleModelFile('${id}','${fileId}',this)">
+                🧊 เลือกไฟล์ .json
+            </label>
+            <span class="model-file-name" id="mf_name_${fileId}">ยังไม่ได้เลือก</span>
+            <button class="btn-rm-model-file" onclick="removeModelFile('${id}','${fileId}')">✕ ลบ</button>
+        </div>
+        <div id="mf_geos_${fileId}"></div>
+    `;
+    container.appendChild(block);
+    itemsData[id].models.push({ fileId, fileName: null, json: null, geos: [] });
+    updateGeoStatus(id);
+}
+
+function removeModelFile(id, fileId) {
+    document.getElementById(fileId)?.remove();
+    itemsData[id].models = itemsData[id].models.filter(m => m.fileId !== fileId);
+    updateGeoStatus(id);
+}
+
+async function handleModelFile(id, fileId, inp) {
+    const f = inp.files[0]; if (!f) return;
+    try {
+        const json = await new Promise((res,rej) => readJSON(f,(e,j) => e ? rej(e) : res(j)));
+
+        // extract ALL geometry IDs from this file
+        let allGeoIds = [];
+        if (json['minecraft:geometry']) {
+            allGeoIds = json['minecraft:geometry'].map(g => g.description.identifier);
+        } else {
+            allGeoIds = Object.keys(json).filter(k => k.startsWith('geometry.'));
+        }
+
+        const entry = itemsData[id].models.find(m => m.fileId === fileId);
+        if (!entry) return;
+        entry.fileName = f.name;
+        entry.json = json;
+
+        // auto-assign keys: first overall geo = 'default', rest use last segment of ID
+        const existingKeys = itemsData[id].models
+            .filter(m => m.fileId !== fileId)
+            .flatMap(m => m.geos.map(g => g.key));
+        const needDefault = !existingKeys.includes('default');
+
+        entry.geos = allGeoIds.map((geoId, i) => {
+            const segs = geoId.replace('geometry.','').split('.');
+            const autoKey = (i === 0 && needDefault) ? 'default' : segs[segs.length - 1];
+            return { geoId, key: autoKey };
+        });
+
+        document.getElementById('mf_name_' + fileId).textContent = '✔ ' + f.name + ' (' + allGeoIds.length + ' geo)';
+        renderGeoRows(id, fileId);
+        updateGeoStatus(id);
+    } catch(e) {
+        document.getElementById('mf_name_' + fileId).textContent = '✕ JSON ผิด';
+    }
+}
+
+function renderGeoRows(id, fileId) {
+    const entry = itemsData[id].models.find(m => m.fileId === fileId);
+    if (!entry) return;
+    const container = document.getElementById('mf_geos_' + fileId);
+    container.innerHTML = '';
+    entry.geos.forEach((g, i) => {
+        const row = document.createElement('div');
+        row.className = 'geo-entry';
+        row.innerHTML =
+            '<div class="geo-entry-key"><input type="text" value="' + g.key + '" placeholder="key" style="margin-top:0;padding:6px 10px;font-size:12px" ' +
+            'onchange="updateModelGeoKey(\'' + id + '\',\'' + fileId + '\',' + i + ',this.value)"></div>' +
+            '<div class="geo-entry-id" title="' + g.geoId + '">' + g.geoId + '</div>' +
+            '<button class="btn-rm-geo" onclick="removeGeoEntry(\'' + id + '\',\'' + fileId + '\',' + i + ')">✕</button>';
+        container.appendChild(row);
+    });
+}
+
+function updateModelGeoKey(id, fileId, idx, val) {
+    const entry = itemsData[id].models.find(m => m.fileId === fileId);
+    if (entry && entry.geos[idx]) entry.geos[idx].key = val.trim();
+}
+
+function removeGeoEntry(id, fileId, idx) {
+    const entry = itemsData[id].models.find(m => m.fileId === fileId);
+    if (!entry) return;
+    entry.geos.splice(idx, 1);
+    renderGeoRows(id, fileId);
+    updateGeoStatus(id);
+}
+
+function updateGeoStatus(id) {
+    const allGeos = itemsData[id].models.flatMap(m => m.geos || []);
+    const fileCount = itemsData[id].models.filter(m => m.json).length;
+    if (allGeos.length === 0) {
+        setStatus('mod_s_' + id, 'def', 'ไม่ได้ใส่ — ใช้ geometry.humanoid.customSlim');
+        setBadge('mod_badge_' + id, false, 'ไม่ได้ใส่ — ใช้ customSlim');
+    } else {
+        setStatus('mod_s_' + id, 'ok', '✔ ' + fileCount + ' ไฟล์ · ' + allGeos.length + ' geometry');
+        setBadge('mod_badge_' + id, true, allGeos.length + ' geo');
+    }
+}
+
+function handleAnim(id, inp) {
+    const f = inp.files[0]; if (!f) return;
+    readJSON(f, (err, json) => {
+        if (err) { setStatus('anim_s_' + id, 'err', '✕ JSON ไม่ถูกต้อง'); return; }
+        itemsData[id].anim = json;
+        const anims = json.animations ? Object.keys(json.animations) : [];
+        itemsData[id].animIds = anims;
+        setStatus('anim_s_' + id, 'ok', `✔ ${f.name} (${anims.length} anim)`);
+        setBadge('anim_badge_' + id, true, anims.length + ' anim');
+    });
+}
+
+function handleAnimCtrl(id, inp) {
+    const f = inp.files[0]; if (!f) return;
+    readJSON(f, (err, json) => {
+        if (err) { setStatus('animctrl_s_' + id, 'err', '✕ JSON ไม่ถูกต้อง'); return; }
+        itemsData[id].animCtrl = json;
+        const ctrls = json.animation_controllers ? Object.keys(json.animation_controllers) : [];
+        itemsData[id].animCtrlIds = ctrls;
+        setStatus('animctrl_s_' + id, 'ok', `✔ ${f.name} (${ctrls.length} ctrl)`);
+        setBadge('animctrl_badge_' + id, true, ctrls.length + ' ctrl');
+    });
+}
+
+function handleRenderCtrl(id, inp) {
+    const f = inp.files[0]; if (!f) return;
+    readJSON(f, (err, json) => {
+        if (err) { setStatus('rc_s_' + id, 'err', '✕ JSON ไม่ถูกต้อง'); return; }
+        itemsData[id].renderCtrl = json;
+        let rcId = null;
+        if (json.render_controllers) rcId = Object.keys(json.render_controllers)[0];
+        itemsData[id].renderCtrlId = rcId;
+        setStatus('rc_s_' + id, 'ok', `✔ ${f.name}${rcId ? ' → ' + rcId : ''}`);
+        setBadge('rc_badge_' + id, true, rcId ? rcId.split('.').pop() : 'custom');
+    });
+}
+
+function showPreview(elId, b64) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.src = 'data:image/png;base64,' + b64;
+    el.style.display = 'block';
+}
+function setStatus(elId, type, msg) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.className = 'status ' + type;
+    el.textContent = msg;
+}
+function setBadge(elId, loaded, txt) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.textContent = txt;
+    if (loaded) el.classList.add('loaded'); else el.classList.remove('loaded');
+}
+function getXboxNames(id) {
+    const panel = document.getElementById('xbox_list_' + id);
+    if (!panel) return [];
+    return Array.from(panel.querySelectorAll('input[type=text]'))
+        .map(i => i.value.trim()).filter(Boolean);
+}
+
+/* ══ PNG → TGA (raw 32-bit BGRA, Type 2 uncompressed) ══ */
+async function pngToTgaBytes(base64Png) {
+    return new Promise(res => {
+        const img = new Image();
+        img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = img.width; c.height = img.height;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+            // TGA header 18 bytes
+            const hdr = new Uint8Array(18);
+            hdr[2]  = 2; // uncompressed true-color
+            hdr[12] = width & 0xff;  hdr[13] = (width >> 8) & 0xff;
+            hdr[14] = height & 0xff; hdr[15] = (height >> 8) & 0xff;
+            hdr[16] = 32;   // bits per pixel
+            hdr[17] = 0x28; // top-left origin, 8 attr bits
+            // pixel data RGBA → BGRA
+            const px = new Uint8Array(width * height * 4);
+            for (let i = 0; i < width * height; i++) {
+                px[i*4]   = data[i*4+2]; // B
+                px[i*4+1] = data[i*4+1]; // G
+                px[i*4+2] = data[i*4];   // R
+                px[i*4+3] = data[i*4+3]; // A
+            }
+            const out = new Uint8Array(18 + px.length);
+            out.set(hdr); out.set(px, 18);
+            res(out);
+        };
+        img.src = 'data:image/png;base64,' + base64Png;
+    });
+}
+
+/* ══ AUTO-EQUIP SCRIPT GENERATOR ══ */
+function generateAutoEquipScript(itemAssignments) {
+    const slotMap = { head: 'Head', chest: 'Chest', legs: 'Legs', feet: 'Feet' };
+    const byPlayer = {};
+    for (const a of itemAssignments) {
+        if (!byPlayer[a.xboxName]) byPlayer[a.xboxName] = [];
+        byPlayer[a.xboxName].push({ itemId: a.itemId, slot: slotMap[a.slot] || 'Head' });
+    }
+    return `// ============================================================
+// CATWAD STUDIO — First-Join Auto-Equip Script
+// Generated by CATWAD MULTI-MODEL BUILDER
+// Requires: @minecraft/server stable (1.20.50+)
+// ต้องเปิด Beta APIs ใน World Settings
+// ============================================================
+
+import { world, system, ItemStack, EquipmentSlot, EntityComponentTypes } from "@minecraft/server";
+
+const SPECIAL_ITEMS = ${JSON.stringify(byPlayer, null, 4)};
+
+const PROP_KEY = "catwad:autoeq_done";
+
+world.afterEvents.playerSpawn.subscribe((event) => {
+    const { player, initialSpawn } = event;
+    if (!initialSpawn) return;
+    if (player.getDynamicProperty(PROP_KEY) === true) return;
+
+    const items = SPECIAL_ITEMS[player.name];
+    if (!items || items.length === 0) return;
+
+    system.runTimeout(() => {
+        if (!player.isValid()) return;
+        const equip = player.getComponent(EntityComponentTypes.Equippable);
+        if (!equip) { console.warn("[CATWAD AutoEquip] ไม่พบ Equippable บน " + player.name); return; }
+
+        let equipped = 0;
+        for (const entry of items) {
+            try {
+                equip.setEquipment(EquipmentSlot[entry.slot], new ItemStack("catwadstudio:" + entry.itemId, 1));
+                equipped++;
+            } catch (e) { console.warn("[CATWAD AutoEquip] Error: " + e); }
+        }
+
+        if (equipped > 0) {
+            player.sendMessage("§a[CATWAD] ยินดีต้อนรับ §e" + player.name + "§a! สวมใส่ชุดพิเศษให้แล้ว " + equipped + " ชิ้น ✨");
+            player.playSound("random.levelup");
+        }
+        player.setDynamicProperty(PROP_KEY, true);
+    }, 20);
+});
+`;
+}
+
+function makeScriptManifest(pName, author, rUUID) {
+    return {
+        format_version: 2,
+        header: { name: `${pName} BP`, description: `CATWAD STUDIO | Author: ${author}`, uuid: crypto.randomUUID(), version: [1,0,0], min_engine_version: [1,20,50] },
+        modules: [
+            { type: 'data', uuid: crypto.randomUUID(), version: [1,0,0] },
+            { type: 'script', language: 'javascript', uuid: crypto.randomUUID(), version: [1,0,0], entry: 'scripts/autoeq.js' }
+        ],
+        dependencies: [
+            { uuid: rUUID, version: [1,0,0] },
+            { module_name: '@minecraft/server', version: '1.9.0' }
+        ]
+    };
+}
+
+/* ══ BUILD ══ */
+async function buildPack() {
+    const ids = Object.keys(itemsData);
+    if (!ids.length) { alert('เพิ่ม item ก่อนนะ!'); return; }
+
+    const pName  = document.getElementById('packName').value  || 'Pack';
+    const author = document.getElementById('packAuthor').value || 'CATWAD';
+    const zip    = new JSZip();
+    const bp     = zip.folder(`${pName} BP`);
+    const rp     = zip.folder(`${pName} RP`);
+
+    const iconF = document.getElementById('packIcon').files[0];
+    if (iconF) { bp.file('pack_icon.png', iconF); rp.file('pack_icon.png', iconF); }
+
+    let itemTexture = { resource_pack_name: 'Catwad', texture_name: 'atlas.items', texture_data: {} };
+    let lang = '';
+    const itemAssignments = [];
+
+    for (const k of ids) {
+        const d = itemsData[k];
+        if (!d.skin) continue;
+
+        const itemId = document.getElementById('id_' + k).value;
+        const name   = document.getElementById('name_' + k).value;
+        const pos    = document.getElementById('pos_' + k).value;
+        const grpMap = { head:'helmet', chest:'chestplate', legs:'leggings', feet:'boots' };
+
+        const ns_folder   = 'catwad_studio';   // namespace folder
+        const texFolder   = `textures/models/${ns_folder}/${itemId}`;   // model/skin texture
+        const itemTexPath = `textures/items/${ns_folder}/${itemId}`;    // item icon
+
+        /* ── BP: item ── */
+        bp.file(`items/${itemId}.json`, JSON.stringify({
+            format_version: '1.20.50',
+            'minecraft:item': {
+                description: {
+                    identifier: `catwadstudio:${itemId}`,
+                    menu_category: { category: 'equipment', group: `itemGroup.name.${grpMap[pos]}` }
+                },
+                components: {
+                    'minecraft:icon': { texture: itemId },
+                    'minecraft:wearable': { slot: `slot.armor.${pos}` }
+                }
+            }
+        }, null, 4));
+
+        /* ── RP: main skin texture ── */
+        rp.file(`${texFolder}.png`, d.skin);
+
+        /* ── RP: emissive → TGA + texture_set.json ── */
+        if (d.emissive && d.emissiveB64) {
+            const tgaBytes = await pngToTgaBytes(d.emissiveB64);
+            rp.file(`${texFolder}_emissive.tga`, tgaBytes);
+            // texture_set references the base skin + emissive
+            const texSet = {
+                format_version: '1.21.30',
+                'minecraft:texture_set': {
+                    color: itemId,
+                    metalness_emissive_roughness_subsurface: `${itemId}_emissive`
+                }
+            };
+            rp.file(`${texFolder}.texture_set.json`, JSON.stringify(texSet, null, 2));
+        }
+
+        /* ── RP: item icon ── */
+        // ของจริง: item icon อยู่ที่ textures/items/pa_skin/xxx.png
+        // ถ้ามี icon แยก ใช้รูปนั้น ถ้าไม่มีใช้ skin texture (b64) แทน
+        if (d.itemIconB64) {
+            rp.file(`${itemTexPath}.png`, d.itemIconB64, { base64: true });
+        } else if (d.skinB64) {
+            rp.file(`${itemTexPath}.png`, d.skinB64, { base64: true });
+        } else {
+            rp.file(`${itemTexPath}.png`, d.skin);
+        }
+        itemTexture.texture_data[itemId] = { textures: itemTexPath };
+
+        /* ── RP: optional JSON files ── */
+        // เขียน model JSON ทุกไฟล์ที่เพิ่มมา (new multi-file structure)
+        if (d.models && d.models.length) {
+            d.models.filter(m => m.json).forEach((m, i) => {
+                const fname = m.fileName ? m.fileName.replace(/\.json$/i,'') : (itemId + '_model' + i);
+                rp.file('models/entity/attachable/' + itemId + '_' + fname + '.json', JSON.stringify(m.json, null, 4));
+            });
+        }
+        if (d.anim)       rp.file(`animations/${itemId}_anim.json`, JSON.stringify(d.anim, null, 4));
+        if (d.animCtrl)   rp.file(`animation_controllers/${itemId}_ctrl.json`, JSON.stringify(d.animCtrl, null, 4));
+        if (d.renderCtrl) rp.file(`render_controllers/${itemId}_rc.json`, JSON.stringify(d.renderCtrl, null, 4));
+
+        /* ── RP: attachable ── */
+        const rcList    = d.renderCtrlId ? [d.renderCtrlId] : ['controller.render.armor'];
+        const animBlock = {};
+        d.animIds.forEach(aid => { animBlock[aid.split('.').pop()] = aid; });
+        d.animCtrlIds.forEach(cid => { animBlock[cid.split('.').pop()] = cid; });
+
+        const attachable = {
+            format_version: '1.10.0',
+            'minecraft:attachable': {
+                description: {
+                    identifier: `catwadstudio:${itemId}`,
+                    render_controllers: rcList,
+                    materials: { default: d.emissive ? 'entity_emissive_alpha' : 'entity_alphatest' },
+                    textures: { default: texFolder },
+                    geometry: (() => {
+                        // build geometry block จาก models array (new structure)
+                        const allGeos = (d.models || []).flatMap(m => m.geos || []);
+                        if (!allGeos.length) return { default: 'geometry.humanoid.customSlim' };
+                        const block = {};
+                        allGeos.forEach((g, i) => {
+                            const key = g.key || (i === 0 ? 'default' : 'geo' + i);
+                            block[key] = g.geoId;
+                        });
+                        return block;
+                    })(),
+                }
+            }
+        };
+        if (Object.keys(animBlock).length > 0) {
+            attachable['minecraft:attachable'].description.animations = animBlock;
+            if (d.animCtrlIds.length > 0) {
+                attachable['minecraft:attachable'].description.animate =
+                    d.animCtrlIds.map(cid => cid.split('.').pop());
+            }
+        }
+        rp.file(`attachables/${itemId}.json`, JSON.stringify(attachable, null, 4));
+
+        lang += `item.catwadstudio:${itemId}=${name}\n`;
+
+        /* ── auto-equip ── */
+        if (autoEquipEnabled) {
+            getXboxNames(k).forEach(xname => {
+                itemAssignments.push({ xboxName: xname, itemId, slot: pos });
+            });
+        }
+    }
+
+    rp.file('textures/item_texture.json', JSON.stringify(itemTexture, null, 4));
+    rp.folder('texts').file('en_US.lang', lang);
+
+    /* ── Manifests ── */
+    const rUUID = crypto.randomUUID();
+
+    rp.file('manifest.json', JSON.stringify({
+        format_version: 2,
+        header: { name: `${pName} RP`, description: `CATWAD STUDIO | Author: ${author}`, uuid: rUUID, version: [1,0,0], min_engine_version: [1,20,50] },
+        modules: [{ type: 'resources', uuid: crypto.randomUUID(), version: [1,0,0] }]
+    }, null, 4));
+
+    if (autoEquipEnabled && itemAssignments.length > 0) {
+        bp.file('manifest.json', JSON.stringify(makeScriptManifest(pName, author, rUUID), null, 4));
+        bp.folder('scripts').file('autoeq.js', generateAutoEquipScript(itemAssignments));
+    } else {
+        bp.file('manifest.json', JSON.stringify({
+            format_version: 2,
+            header: { name: `${pName} BP`, description: `CATWAD STUDIO | Author: ${author}`, uuid: crypto.randomUUID(), version: [1,0,0], min_engine_version: [1,20,50] },
+            modules: [{ type: 'data', uuid: crypto.randomUUID(), version: [1,0,0] }],
+            dependencies: [{ uuid: rUUID, version: [1,0,0] }]
+        }, null, 4));
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    saveAs(blob, `${pName}.mcaddon`);
+
+}
+
+addItem();
+</script>
+</body>
+</html>
